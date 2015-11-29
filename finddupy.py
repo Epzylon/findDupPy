@@ -4,6 +4,7 @@ Created on 26/11/2015
 @author: epzylon
 '''
 import argparse
+from filecmp import cmp
 from os import listdir
 from os.path import isfile, isdir, join, getsize
 
@@ -23,6 +24,7 @@ class filelist(object):
     def __init__(self):
         self.dirlist = []
         self.current = 0
+        self.duplicate = []
     
     def __iter__(self):
         return self
@@ -46,36 +48,59 @@ class filelist(object):
         Return a list with the files with their respective duplicates
         like [ [file_orig,file_dup1,file_dup2,...],[file_orig2...]
         """
-        #The current file beeing analized
-        current_file = ""
-        #The size of the current file
-        size = 0
+        #The current file and size beeing analized
+        c_file = ""
+        c_size = 0
         
-        for file_and_size in self.dirlist:
-            
-            #First loop
-            if file_and_size[self.f_pos] == "" and size == 0:
-                #Save the first file name and their size
-                current_file = file_and_size[self.f_pos]
-                size = file_and_size[self.s_pos]
-                continue
-            #Followings loops
+        #The previous file and size
+        p_file = ""
+        p_size = ""
+        
+        #The duplicate file list
+        dup_list = []
+        
+        #set of duplicated files
+        file_set = []
+        
+        for current in self.dirlist:
+            #Firs round
+            if p_file == "" and p_size == "":
+                p_file = current[self.f_pos]
+                p_size = current[self.s_pos]
+            #next ones
             else:
-                #Do not compare if the file path is the same
-                if file_and_size[self.f_pos] == current_file:
-                    continue
-                #Skip empty files
-                elif file_and_size[self.s_pos] == 0:
-                    continue
+                c_file = current[self.f_pos]
+                c_size = current[self.s_pos]
+                
+                #Compare sizes
+                if p_size == c_size:
+                    #If size are equals, compare the file byte by byte
+                    if cmp(p_file,c_file):
+                        #If are equals, adds the files to the set
+                        if not p_file in file_set:
+                            file_set.append(p_file)
+                        file_set.append(c_file)
+                    else:
+                        #Otherwise add the set to dup list
+                        #and reset the file set
+                        if file_set != []:
+                            dup_list.append(file_set)
+                            file_set = []
+                            p_file = c_file
+                            p_size = c_size                      
                 else:
-                    #Otherwise if the size is the same
-                    if size == file_and_size[self.s_pos]:
-                        #Read firs bytes
-                        pass
-                        
-            
-            
-            
+                    #If the size are differents
+                    # and the set is not empty, adds the set
+                    # and reset the set
+                    p_file = c_file
+                    p_size = c_size
+                    if file_set != []:
+                        dup_list.append(file_set)
+                        file_set = []
+                    
+        self.duplicate = dup_list
+        return dup_list
+                         
             
 
 
@@ -90,6 +115,9 @@ if __name__ == '__main__':
                         help="List all the files the will be processed")
     parser.add_argument("-f", "--folders",default=".",nargs='*',
                         help="Folders to be processed")
+    
+    args = parser.parse_args()
+    
     
 
     

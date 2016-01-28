@@ -5,32 +5,30 @@ Created on 26/11/2015
 '''
 import argparse
 from filecmp import cmp
-from os import listdir
-from os.path import isfile, isdir, join, getsize, islink, split
+from os import listdir, remove, mkdir
+from os.path import isfile, isdir, exists, join, getsize, islink, split
 from shutil import move, copy2
+from email.policy import default
 
 
 #TODO: catch Permission denied exception
 #TODO: Check if links points to upper level directories
 #TODO: Avoid wrong codification name files
-
-
-
-class fileList(object):
+ 
+class dupFinder(object):
     """
-    This class recieve all the folders which will be proccessed
-    and will return all the files on it with their respective size
+    This class finds duplicated files on a sorted list of file and size list
+    like [[file,size],...] and returns a list of equal files list
     """
+    #File position on the file/size tup
+    __f_pos = 0
     #Size position on the file/size tup
     __s_pos = 1
     
     def __init__(self):
-        self.dirlist = []
         self.verbose = False
-    
-    def __iter__(self):
-        return self
-    
+        self.dirlist = []
+
     def add_folder(self,folder):
         """
         This method recieve a full path folder and add the files contained
@@ -45,24 +43,11 @@ class fileList(object):
                     self.add_folder(file)
                 elif isfile(file) and not islink(file):
                     self.dirlist.append([file,getsize(file)])
-        if self.verbose == True:
-            print("Sorting\n")
-        self.dirlist.sort(key=lambda x: x[self.__s_pos])
-        if self.verbose == True:
-            print("End sort\n")
-    
-class dupFinder(object):
-    """
-    This class finds duplicated files on a sorted list of file and size list
-    like [[file,size],...] and returns a list of equal files list
-    """
-    #File position on the file/size tup
-    __f_pos = 0
-    #Size position on the file/size tup
-    __s_pos = 1
-    def __init__(self,dirlist):
-        self.dirlist = dirlist
-        self.verbose = False
+                    if self.verbose == True:
+                        print("Sorting\n")
+                    self.dirlist.sort(key=lambda x: x[self.__s_pos])
+                    if self.verbose == True:
+                        print("End sort\n")
         
     def search_duplicates(self):  
         """
@@ -133,7 +118,6 @@ class makeOrder(object):
     move = True
     rename = False
     delete = False
-    print_dups = False
     
     #On move action, if one file have several duplicates,
     #would you like to move one copy and delete the others?
@@ -141,7 +125,7 @@ class makeOrder(object):
     
     
     rename_prefix = "dup_"
-    move_folder = "/tmp/dup"
+    move_folder = "/tmp/dups"
     
     
     
@@ -159,9 +143,17 @@ class makeOrder(object):
                     c_counter += 1
                     continue
                 else:
-                    move(dupfile, self.move_folder)
+                    if c_counter > 1 and self.delete_others:
+                        remove(dupfile)
+                    else:
+                        if not exists(self.move_folder):
+                            mkdir(self.move_folder)
+                        elif isfile(self.move_folder):
+                            raise Exception()
+                        print(self.move_folder)                     
+                        move(dupfile, self.move_folder)
                     c_counter += 1
-                    
+                     
     
     def rename_dups(self):
         for fileset in self.duplist:
@@ -178,7 +170,16 @@ class makeOrder(object):
                     copy2(dupfile,new_name)
                     
             
-        
+    def remove_dups(self):
+        for fileset in self.duplist:
+            c_counter = 0
+            for dupfile in fileset:
+                if c_counter == 0:
+                    c_counter += 1
+                    continue
+                else:
+                    c_counter += 1
+                    remove(dupfile)
     
         
             
@@ -196,8 +197,15 @@ if __name__ == '__main__':
                         help="List all the files the will be processed")
     parser.add_argument("-f", "--folders",default=".",nargs='*',
                         help="Folders to be processed")
+    parser.add_argument("-m","--move-to",default=None,
+                        help="Folder where to move the duplicated files")
+    parser.add_argument("-d","--delete",default=None,
+                        help="delete duplicated files")
+    parser.add_argument("-r","--rename",help="Rename duplicated files")
     
     args = parser.parse_args()
+    
+    
     
     
 

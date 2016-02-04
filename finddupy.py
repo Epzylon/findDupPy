@@ -153,23 +153,31 @@ class makeOrder(object):
             raise Exception()
         
     def move_dups(self):
+        #seek on the duplist
         for fileset in self.duplist:
             c_counter = 0
+            #seek in each file of the dup-filesegt
             for dupfile in fileset:
+                #if we want to avoid to remove the first one
                 if self.skipe_first == True:
                     if c_counter == 0:
                         c_counter += 1
+                        #then do nothing with the first one
                         continue
                 else:
                     #If we already has copied othe dup, delete others
                     if self.delete_others == True:
                         remove(dupfile)
                     else:
+                        #Check whether the move folder exists or not
                         if not exists(self.move_folder):
+                            #If doesn't we create
                             mkdir(self.move_folder)
                         elif isfile(self.move_folder):
+                            #if already exists a file with the rename folder
+                            #we raise an exception
                             raise Exception()
-                                             
+                                              
                         move(dupfile, self.move_folder)
                         if args.verbose == True:
                             print("Moving " + dupfile + " to " +
@@ -196,6 +204,7 @@ class makeOrder(object):
                     new_name = file_path + "/" + self.rename_prefix + file_name
                     if args.verbose == True:
                         print('Renamed ' + new_name )
+                    #Coping with the same attributes as the original
                     copy2(dupfile,new_name)
                     #Removeing the old named file
                     remove(dupfile)
@@ -269,10 +278,8 @@ if __name__ == '__main__':
     args = parser.parse_args()
     dup = dupFinder()
     
-    if args.verbose == True:
-        dup.verbose = True
-        
-    dup.nonrecursive == args.nonrecursive
+    dup.verbose = args.verbose        
+    dup.nonrecursive = args.nonrecursive
         
     for folder in args.folders:
         dup.add_folder(folder)
@@ -296,9 +303,8 @@ if __name__ == '__main__':
             
     elif args.action == 'move':
         morder = makeOrder(dup.duplicate)
-        if args.delete_others == True:
-            morder.delete_others = True
-            morder.skipe_first = args.skip_first
+        morder.delete_others = args.delete_others
+        morder.skipe_first = args.skip_first
         morder.move_dups()
         
     elif args.action == 'rename':
@@ -314,28 +320,4 @@ if __name__ == '__main__':
         morder = makeOrder(dup.duplicate)
         morder.skipe_first = args.skip_first
         morder.remove_dups()
-        
-        
-        
-
-    
-
-
-    
-               
-
-    
-            
-    
-    
-    
-        
-    
-    
-        
-    
-    
-
-    
-    
-    
+          

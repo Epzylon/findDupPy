@@ -15,6 +15,11 @@ from shutil import move, copy2
 #TODO: Check if links points to upper level directories
 #TODO: Avoid wrong codification name files
 #TODO: Add replace_with_link function
+
+class ErrorHandler(Exception):
+    pass
+
+
  
 class dupFinder(object):
     """
@@ -27,6 +32,7 @@ class dupFinder(object):
         self.verbose = False
         self.avoid_empties = True
         self.dirlist = []
+        self.nonrecursive = False
         
         #File position on the file/size tup
         self.__f_pos = 0
@@ -38,20 +44,31 @@ class dupFinder(object):
         This method recieve a full path folder and add the files contained
         on it to the file list
         """
+        
         if isdir(folder):
             if self.verbose == True:
                     print("Adding " + folder)
+            
+            #Searching on the folder
             for f in listdir(folder):
                 file = join(folder,f)
+                
+                #If there is a subfolder:
                 if isdir(file) and not islink(file):
-                    self.add_folder(file)
+                    #And non-recursive option is not activated
+                    if self.nonrecursive == False:
+                        #then we add the folder to be analized
+                        self.add_folder(file)
+                #if it is a file
                 elif isfile(file) and not islink(file):
+                    #avoid to analize empties files
                     if self.avoid_empties == True:
                         if getsize(file) != 0:
                             self.dirlist.append([file,getsize(file)])
                     else:
+                        #we add even if it is a empty
                         self.dirlist.append([file,getsize(file)])
-                    #Sorting
+                    #Sorting by size
                     self.dirlist.sort(key=lambda x: x[self.__s_pos])
         
     def search_duplicates(self):  
@@ -60,56 +77,56 @@ class dupFinder(object):
         like [ [file_orig,file_dup1,file_dup2,...],[file_orig2...]
         """
         #The current file and size beeing analized
-        _c_file = ""
-        _c_size = 0
+        c_file = ""
+        c_size = 0
         
         #The previous file and size
-        _p_file = ""
-        _p_size = ""
+        p_file = ""
+        p_size = ""
         
         #The duplicate file list
         dup_list = []
         
         #set of duplicated files
-        _file_set = []
+        file_set = []
         
         for current in self.dirlist:
             if self.verbose == True:
                 print("Searching dup for " + str(current[0]))
             #Firs round
-            if _p_file == "" and _p_size == "":
-                _p_file = current[self.__f_pos]
-                _p_size = current[self.__s_pos]
+            if p_file == "" and p_size == "":
+                p_file = current[self.__f_pos]
+                p_size = current[self.__s_pos]
             #next ones
             else:
-                _c_file = current[self.__f_pos]
-                _c_size = current[self.__s_pos]
+                c_file = current[self.__f_pos]
+                c_size = current[self.__s_pos]
                 
                 #Compare sizes
-                if _p_size == _c_size:
+                if p_size == c_size:
                     #If size are equals, compare the file byte by byte
-                    if cmp(_p_file,_c_file):
+                    if cmp(p_file,c_file):
                         #If are equals, adds the files to the set
-                        if not _p_file in _file_set:
-                            _file_set.append(_p_file)
-                        _file_set.append(_c_file)
+                        if not p_file in file_set:
+                            file_set.append(p_file)
+                        file_set.append(c_file)
                     else:
                         #Otherwise add the set to dup list
                         #and reset the file set
-                        if _file_set != []:
-                            dup_list.append(_file_set)
-                            _file_set = []
-                            _p_file = _c_file
-                            _p_size = _c_size                      
+                        if file_set != []:
+                            dup_list.append(file_set)
+                            file_set = []
+                            p_file = c_file
+                            p_size = c_size                      
                 else:
                     #If the size are differents
                     # and the set is not empty, adds the set
                     # and reset the set
-                    _p_file = _c_file
-                    _p_size = _c_size
-                    if _file_set != []:
-                        dup_list.append(_file_set)
-                        _file_set = []
+                    p_file = c_file
+                    p_size = c_size
+                    if file_set != []:
+                        dup_list.append(file_set)
+                        file_set = []
                     
         self.duplicate = dup_list
         return self.duplicate
@@ -188,11 +205,15 @@ class makeOrder(object):
         for fileset in self.duplist:
             c_counter = 0
             for dupfile in fileset:
-                if c_counter == 0:
+                if c_counter == 0 and self.skipe_first == True:
+                    if self.verbose == True:
+                        print("The following file will not be deleted: " + 
+                              dupfile)
                     c_counter += 1
                     continue
                 else:
                     c_counter += 1
+                    print("Removing: " + dupfile)
                     remove(dupfile)
     
         
@@ -227,6 +248,13 @@ if __name__ == '__main__':
                         'skip the first found and move/delete/rename the'+
                         ' other copies found. It saves the first file found')
     
+    parser.add_argument("-c","--csv-list", action='store_true',
+                        dest="csv",help='List in CSV format')
+    
+    parser.add_argument("-n","--no-recursive",action='store_true',
+                        dest='nonrecursive',
+                        help="Don't analize recursively sub folders")
+    
     parser.add_argument("-x","--delete-on-move",action='store_true',
                         dest="delete_others",
                         help="Move one file and delete others")
@@ -244,6 +272,8 @@ if __name__ == '__main__':
     if args.verbose == True:
         dup.verbose = True
         
+    dup.nonrecursive == args.nonrecursive
+        
     for folder in args.folders:
         dup.add_folder(folder)
         
@@ -253,8 +283,15 @@ if __name__ == '__main__':
         for file_set in dup.duplicate:
             if args.verbose == True:
                 print("Los siguientes archivos son iguales:")
-            for file in file_set:
-                print(file)
+            if args.csv == True:
+                line = ""
+                for file in file_set:
+                    line = line + file + ","
+                line = line[0:-1]
+                print(line)
+            else:
+                for file in file_set:
+                    print(file)
             print("")
             
     elif args.action == 'move':

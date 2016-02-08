@@ -7,6 +7,7 @@ import argparse
 from filecmp import cmp
 from os import listdir, remove, mkdir
 from os.path import isfile, isdir, exists, join, getsize, islink, split
+from os.path.os import rename
 from shutil import move, copy2
 
 
@@ -15,11 +16,17 @@ from shutil import move, copy2
 #TODO: Check if links points to upper level directories
 #TODO: Avoid wrong codification name files
 #TODO: Add replace_with_link function
+#TODO: Ignore hiden files
 
-class ErrorHandler(Exception):
-    pass
-
-
+class PermError(Exception):
+    """
+    Permissions errors with files
+    """
+    def __init___(self,file,err_type):
+        print("The file " + file + " is not accesible, error: " + err_type)
+        
+        
+    
  
 class dupFinder(object):
     """
@@ -205,9 +212,8 @@ class makeOrder(object):
                     if args.verbose == True:
                         print('Renamed ' + new_name )
                     #Coping with the same attributes as the original
-                    copy2(dupfile,new_name)
-                    #Removeing the old named file
-                    remove(dupfile)
+                    rename(dupfile,new_name)
+
                     
             
     def remove_dups(self):

@@ -5,10 +5,11 @@ Created on 26/11/2015
 '''
 import argparse
 from filecmp import cmp
-from os import listdir, remove, mkdir
+from os import listdir, remove, mkdir, replace
 from os.path import isfile, isdir, exists, join, getsize, islink, split
-from os.path.os import rename
-from shutil import move, copy2
+from shutil import move
+import sys
+
 
 
 #TODO: catch Permission denied exception
@@ -23,9 +24,17 @@ class PermError(Exception):
     Permissions errors with files
     """
     def __init___(self,file,err_type):
-        print("The file " + file + " is not accesible, error: " + err_type)
-        
-        
+        self.file = file
+        self.err_type = err_type
+        print("The file " + self.file + " is not accesible, error: " + err_type,
+              file=sys.stderr)
+
+class NoDupFiles(Exception):
+    pass
+
+class IsntAFolder(Exception):
+    pass
+
     
  
 class dupFinder(object):
@@ -40,7 +49,7 @@ class dupFinder(object):
         self.avoid_empties = True
         self.dirlist = []
         self.nonrecursive = False
-        
+        self.duplicate = []
         #File position on the file/size tup
         self.__f_pos = 0
         #Size position on the file/size tup
@@ -51,32 +60,40 @@ class dupFinder(object):
         This method recieve a full path folder and add the files contained
         on it to the file list
         """
-        
-        if isdir(folder):
-            if self.verbose == True:
+        try:
+            if isdir(folder):
+                file_list = listdir(folder)
+                if self.verbose == True:
                     print("Adding " + folder)
+            else:
+                raise IsntAFolder
             
-            #Searching on the folder
-            for f in listdir(folder):
-                file = join(folder,f)
+        except PermissionError:
+            if args.verbose == True:
+                print("Can't read content on folder " + folder,file=sys.stderr)
+            return
+            
+        #Searching on the folder
+        for f in file_list:
+            file = join(folder,f)
                 
-                #If there is a subfolder:
-                if isdir(file) and not islink(file):
-                    #And non-recursive option is not activated
-                    if self.nonrecursive == False:
-                        #then we add the folder to be analized
-                        self.add_folder(file)
-                #if it is a file
-                elif isfile(file) and not islink(file):
-                    #avoid to analize empties files
-                    if self.avoid_empties == True:
-                        if getsize(file) != 0:
-                            self.dirlist.append([file,getsize(file)])
-                    else:
-                        #we add even if it is a empty
+            #If there is a subfolder:
+            if isdir(file) and not islink(file):
+                #And non-recursive option is not activated
+                if self.nonrecursive == False:
+                    #then we add the folder to be analized
+                    self.add_folder(file)
+            #if it is a file
+            elif isfile(file) and not islink(file):
+                #avoid to analize empties files
+                if self.avoid_empties == True:
+                    if getsize(file) != 0:
                         self.dirlist.append([file,getsize(file)])
-                    #Sorting by size
-                    self.dirlist.sort(key=lambda x: x[self.__s_pos])
+                else:
+                    #we add even if it is a empty
+                    self.dirlist.append([file,getsize(file)])
+        #Sorting by size
+        self.dirlist.sort(key=lambda x: x[self.__s_pos])
         
     def search_duplicates(self):  
         """
@@ -157,7 +174,8 @@ class makeOrder(object):
         if duplist != []:
             self.duplist = duplist
         else:
-            raise Exception()
+            raise NoDupFiles()
+        
         
     def move_dups(self):
         #seek on the duplist
@@ -174,7 +192,10 @@ class makeOrder(object):
                 else:
                     #If we already has copied othe dup, delete others
                     if self.delete_others == True:
-                        remove(dupfile)
+                        try:
+                            remove(dupfile)
+                        except:
+                            raise PermError(dupfile,"Can't Delete")
                     else:
                         #Check whether the move folder exists or not
                         if not exists(self.move_folder):
@@ -183,12 +204,16 @@ class makeOrder(object):
                         elif isfile(self.move_folder):
                             #if already exists a file with the rename folder
                             #we raise an exception
-                            raise Exception()
-                                              
-                        move(dupfile, self.move_folder)
-                        if args.verbose == True:
-                            print("Moving " + dupfile + " to " +
-                                  self.move_folder)
+                            raise PermError(self.move_folder,
+                                            "There is a file called " +
+                                            self.move_folder)
+                        try:                      
+                            move(dupfile, self.move_folder)
+                            if args.verbose == True:
+                                print("Moving " + dupfile + " to " +
+                                      self.move_folder)
+                        except:
+                            raise PermError(dupfile,"Can't move")
                     c_counter += 1
                      
     
@@ -212,7 +237,7 @@ class makeOrder(object):
                     if args.verbose == True:
                         print('Renamed ' + new_name )
                     #Coping with the same attributes as the original
-                    rename(dupfile,new_name)
+                    replace(dupfile,new_name)
 
                     
             
@@ -228,8 +253,12 @@ class makeOrder(object):
                     continue
                 else:
                     c_counter += 1
-                    print("Removing: " + dupfile)
-                    remove(dupfile)
+                    if self.verbose == True:
+                        print("Removing: " + dupfile)
+                    try:
+                        remove(dupfile)
+                    except:
+                        raise PermError(dupfile,"Can't delete " + dupfile)
     
         
 if __name__ == '__main__':
@@ -237,10 +266,10 @@ if __name__ == '__main__':
     prog_name="finddupy.py"
     
     desc = '''
-    Search and delete/move duplicated files
+    Search and delete/move/rename duplicated files
     '''
         
-    epilog = "Visit our blog at blog.netsecure.com.ar"
+    epilog = "Samples on README.md"
     
     parser = argparse.ArgumentParser(description=desc,
                                      epilog=epilog,prog=prog_name)
@@ -251,7 +280,7 @@ if __name__ == '__main__':
     
     parser.add_argument("-a","--action",
                         choices=['list','move','rename','delete'],
-                        help="Action to take with the dup files")
+                        help="Action to be taken with the dup-files")
     
     parser.add_argument("-m","--move-folder",action='store',
                         help="Folder where to move the duplicated files",
@@ -260,7 +289,7 @@ if __name__ == '__main__':
     parser.add_argument("-s", "--skip-first",action='store_true',
                         dest='skip_first',
                         help='On Move, Delete and Rename actions' +
-                        'skip the first found and move/delete/rename the'+
+                        ' skip the first found and move/delete/rename the'+
                         ' other copies found. It saves the first file found')
     
     parser.add_argument("-c","--csv-list", action='store_true',
@@ -282,20 +311,34 @@ if __name__ == '__main__':
                         help="Verbose mode")
     
     args = parser.parse_args()
+    
+    #Create the object to search duplicated files
     dup = dupFinder()
     
-    dup.verbose = args.verbose        
+    #Set on verbose mode if was required
+    dup.verbose = args.verbose 
+    #Set on Non Recursive if was required       
     dup.nonrecursive = args.nonrecursive
-        
+    
+    folders_count = 0
     for folder in args.folders:
-        dup.add_folder(folder)
-        
-    dup.search_duplicates()
+        try:
+            dup.add_folder(folder)
+        except IsntAFolder:
+            print(folder + " is not a folder or doens't exists",file=sys.stderr) 
+        else:
+            dup.search_duplicates()
+            folders_count += 1
+            
+    #If duplicated list is empty ther is nothing more todo
+    if dup.duplicate == []:
+        print("There is no duplicated files")
+        exit(0)
     
     if args.action == 'list':
         for file_set in dup.duplicate:
             if args.verbose == True:
-                print("Los siguientes archivos son iguales:")
+                print("The following files are equals: ")
             if args.csv == True:
                 line = ""
                 for file in file_set:
@@ -311,7 +354,14 @@ if __name__ == '__main__':
         morder = makeOrder(dup.duplicate)
         morder.delete_others = args.delete_others
         morder.skipe_first = args.skip_first
-        morder.move_dups()
+
+        try:
+            morder.move_dups()
+        except PermError as pE:
+            if args.verbose == True:
+                print("Can't remove file: " + pE.file)
+            else:
+                print("Can't remove file: " + pE.file, file=sys.stderr)
         
     elif args.action == 'rename':
         if hasattr(args, 'rsuffix') == True:
@@ -325,5 +375,5 @@ if __name__ == '__main__':
     elif args.action == 'delete':
         morder = makeOrder(dup.duplicate)
         morder.skipe_first = args.skip_first
+        morder.verbose = args.verbose
         morder.remove_dups()
-          

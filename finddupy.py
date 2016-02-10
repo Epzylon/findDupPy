@@ -8,6 +8,7 @@ from filecmp import cmp
 from os import listdir, remove, mkdir, replace
 from os.path import isfile, isdir, exists, join, getsize, islink, split
 from shutil import move
+from shutil import Error as shError
 import sys
 
 
@@ -165,7 +166,6 @@ class makeOrder(object):
         #On move action, if one file have several duplicates,
         #would you like to move one copy and delete the others?
         self.delete_others = False
-    
         self.rename_prefix = "dup_"
         self.move_folder = "/tmp/dups"
         self.skipe_first = False
@@ -181,6 +181,7 @@ class makeOrder(object):
         #seek on the duplist
         for fileset in self.duplist:
             c_counter = 0
+            dup_counter = 1
             #seek in each file of the dup-filesegt
             for dupfile in fileset:
                 #if we want to avoid to remove the first one
@@ -207,11 +208,18 @@ class makeOrder(object):
                             raise PermError(self.move_folder,
                                             "There is a file called " +
                                             self.move_folder)
-                        try:                      
-                            move(dupfile, self.move_folder)
+                        try:
+                            file_path,file_name = split(dupfile)
+                            if exists(join(self.move_folder,file_name)):
+                                new_f_name = file_name + "." + str(dup_counter)
+                                dup_counter += 1
+                                dest = join(self.move_folder, new_f_name)
+                            else:
+                                dest = join(self.move_folder, file_name)     
+                                         
+                            move(dupfile,dest)
                             if args.verbose == True:
-                                print("Moving " + dupfile + " to " +
-                                      self.move_folder)
+                                print("Moving " + dupfile + " to " + dest)                           
                         except:
                             raise PermError(dupfile,"Can't move")
                     c_counter += 1
@@ -304,7 +312,8 @@ if __name__ == '__main__':
                         help="Move one file and delete others")
     
     parser.add_argument("-r","--rename-suffix",action='store',
-                        help="Rename duplicated files with the prefix provided",
+                        help="Rename duplicated files with the prefix provided"+
+                        "by default dup_",
                         dest="rsuffix")
     
     parser.add_argument("-v","--verbose",action='store_true',
@@ -352,6 +361,8 @@ if __name__ == '__main__':
             
     elif args.action == 'move':
         morder = makeOrder(dup.duplicate)
+        if args.mfolder != None:
+            morder.move_folder = args.mfolder
         morder.delete_others = args.delete_others
         morder.skipe_first = args.skip_first
 
@@ -366,7 +377,8 @@ if __name__ == '__main__':
     elif args.action == 'rename':
         if hasattr(args, 'rsuffix') == True:
             morder = makeOrder(dup.duplicate)
-            morder.rename_prefix = args.rsuffix
+            if args.rsuffix != None:
+                morder.rename_prefix = args.rsuffix
             morder.skipe_first = args.skip_first
             morder.rename_dups()
         else:

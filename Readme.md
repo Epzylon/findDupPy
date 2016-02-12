@@ -7,11 +7,11 @@ compares the file size first and then compares byte by byte till find (or not) a
 
 ## **Syntax
 
-'''python
+```ruby
 python3 finduppy.py [-f FOLDERS] [-v] [-a [list|rename|move|delete]] [-m MOVE-FOLDER] [-s] [-c] [-n] [-r RENAME-SUFFIX]
 
 end
-'''
+```
 ## **Samples of usage
 - List duplicated files on the current folder
 python finddupy.py -v -a list

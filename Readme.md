@@ -15,3 +15,6 @@ end
 ## **Samples of usage
 - List duplicated files on the current folder
 python finddupy.py -v -a list
+
+- List duplicated files on several folders
+python finddupy.py -v -a list -f /var/www /home/web

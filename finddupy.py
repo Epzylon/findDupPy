@@ -1,7 +1,8 @@
 '''
 Created on 26/11/2015
 
-@author: epzylon
+@author: Gustavo Rodriguez
+
 '''
 import argparse
 from filecmp import cmp
@@ -13,8 +14,6 @@ import sys
 
 
 
-#TODO: catch Permission denied exception
-#TODO: catch FileNotFoundError
 #TODO: Check if links points to upper level directories
 #TODO: Avoid wrong codification name files
 #TODO: Add replace_with_link function

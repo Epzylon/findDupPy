@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+# coding: utf-8
 '''
 Created on 26/11/2015
 
@@ -11,6 +13,7 @@ from os.path import isfile, isdir, exists, join, getsize, islink, split
 from shutil import move
 from shutil import Error as shError
 import sys
+
 
 
 
@@ -116,7 +119,10 @@ class dupFinder(object):
         
         for current in self.dirlist:
             if self.verbose == True:
-                print("Searching dup for " + str(current[0]))
+                try:
+                    print("Searching dup for " + str(current[0]))
+                except UnicodeEncodeError:
+                    print("Searching dup for un codificable charcter")
             #Firs round
             if p_file == "" and p_size == "":
                 p_file = current[self.__f_pos]
@@ -129,19 +135,24 @@ class dupFinder(object):
                 #Compare sizes
                 if p_size == c_size:
                     #If size are equals, compare the file byte by byte
-                    if cmp(p_file,c_file):
+                    try:
+                        if cmp(p_file,c_file):
                         #If are equals, adds the files to the set
-                        if not p_file in file_set:
-                            file_set.append(p_file)
-                        file_set.append(c_file)
-                    else:
-                        #Otherwise add the set to dup list
-                        #and reset the file set
-                        if file_set != []:
-                            dup_list.append(file_set)
-                            file_set = []
-                            p_file = c_file
-                            p_size = c_size                      
+                            if not p_file in file_set:
+                                file_set.append(p_file)
+                            file_set.append(c_file)
+                        else:
+                            #Otherwise add the set to dup list
+                            #and reset the file set
+                            if file_set != []:
+                                dup_list.append(file_set)
+                                file_set = []
+                                p_file = c_file
+                                p_size = c_size
+                    except PermissionError:
+                        print("No possible read file " + c_file,
+                              file=sys.stderr)
+                                         
                 else:
                     #If the size are differents
                     # and the set is not empty, adds the set
